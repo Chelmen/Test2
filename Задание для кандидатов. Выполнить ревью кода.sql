@@ -4,25 +4,26 @@ as
 set nocount on
 begin
 	declare @RowCount int = (select count(*) from syn.SA_CustomerSeasonal)
-	declare @ErrorMessage varchar(max)
+	,@ErrorMessage varchar(max)
 
--- Проверка на корректность загрузки
-	if not exists (
+                -- Проверка на корректность загрузки
+		if not exists (
 	select 1
-	from syn.ImportFile as f
-	where f.ID = @ID_Record
-		and f.FlagLoaded = cast(1 as bit)
+	from syn.ImportFile as imf
+	where imf.ID = @ID_Record
+		and imf.FlagLoaded = cast(1 as bit)
 	)
 		begin
-			set @ErrorMessage = 'Ошибка при загрузке файла, проверьте корректность данных'
+		set @ErrorMessage = 'Ошибка при загрузке файла, проверьте корректность данных'
 
 			raiserror(@ErrorMessage, 3, 1)
+	
 			return
 		end
 
-	CREATE TABLE #ProcessedRows(ActionType varchar(255), ID int)
+	create table #ProcessedRows (ActionType varchar(255), ID int)
 	
-	--Чтение из слоя временных данных
+	-- Чтение из слоя временных данных
 	select
 		cc.ID as ID_dbo_Customer
 		,cst.ID as ID_CustomerSystemType
@@ -32,7 +33,7 @@ begin
 		,cd.ID as ID_dbo_CustomerDistributor
 		,cast(isnull(sa.FlagActive, 0) as bit) as FlagActive
 	into #CustomerSeasonal
-	from syn.SA_CustomerSeasonal cs
+	from syn.SA_CustomerSeasonal as cs
 		join dbo.Customer as cc on cc.UID_DS = sa.UID_DS_Customer
 			and cc.ID_mapping_DataSource = 1
 		join dbo.Season as s on s.Name = sa.Season
@@ -43,8 +44,10 @@ begin
 		and try_cast(sa.DateEnd as date) is not null
 		and try_cast(isnull(sa.FlagActive, 0) as bit) is not null
 
-	-- Определяем некорректные записи
-	-- Добавляем причину, по которой запись считается некорректной
+	/*
+	    Определяем некорректные записи.
+	    Добавляем причину, по которой запись считается некорректной
+	*/
 	select
 		sa.*
 		,case
@@ -60,7 +63,8 @@ begin
 	from syn.SA_CustomerSeasonal as cs
 	left join dbo.Customer as cc on cc.UID_DS = sa.UID_DS_Customer
 		and cc.ID_mapping_DataSource = 1
-	left join dbo.Customer as cd on cd.UID_DS = sa.UID_DS_CustomerDistributor and cd.ID_mapping_DataSource = 1
+	left join dbo.Customer as cd on cd.UID_DS = sa.UID_DS_CustomerDistributor
+	        and cd.ID_mapping_DataSource = 1
 	left join dbo.Season as s on s.Name = sa.Season
 	left join syn.CustomerSystemType as cst on cst.Name = sa.CustomerSystemType
 	where cc.ID is null
